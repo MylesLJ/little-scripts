@@ -28,24 +28,21 @@ SEMESTERS = [
     ("SPRING", (1, 10), 1),
 ]
 
-DAY_NAMES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
-
 COLUMNS = [
-    "Summary", "Semester", "Day", "Week",
+    "Summary", "Semester", "Exec Position", "Day", "Week",
     "Date", "Start Time", "End Time", "All-Day",
     "Location", "Description", "Status",
     "Recurring?", "Meet Link", "UID",
 ]
-COLUMN_WIDTHS = [40, 8, 5, 6, 12, 10, 10, 8, 25, 40, 10, 10, 30, 32]
+COLUMN_WIDTHS = [40, 8, 14, 5, 6, 12, 10, 10, 8, 25, 40, 10, 10, 30, 32]
 
 
 @dataclass
 class EventRow:
     summary: str
     semester: str
-    day: str
     week: int
-    date: str
+    date: date
     start_time: str
     end_time: str
     all_day: str
@@ -94,10 +91,6 @@ def week_number(d: date, semester_start: date) -> int:
     if d < week1_start:
         return 0
     return ((d - week1_start).days // 7) + 1
-
-
-def day_name(d: date) -> str:
-    return DAY_NAMES[d.weekday()]
 
 
 def to_local_date(dt: date | datetime) -> date:
@@ -179,9 +172,8 @@ def build_rows(
         rows.append(EventRow(
             summary=summary,
             semester=semester,
-            day=day_name(local_date),
             week=week_number(local_date, semester_start_date(semester, ay)),
-            date=local_date.isoformat(),
+            date=local_date,
             start_time="" if all_day else to_local_time_str(dtstart),
             end_time="" if all_day else to_local_time_str(dtend),
             all_day="Yes" if all_day else "No",
@@ -208,12 +200,15 @@ def write_xlsx(rows: list[EventRow], output_path: Path, ay: int) -> None:
     sheet.freeze_panes = "A2"
 
     for row in rows:
+        excel_row = sheet.max_row + 1
+        day_formula = f'=UPPER(TEXT(F{excel_row},"DDD"))'
         sheet.append([
-            row.summary, row.semester, row.day, row.week,
+            row.summary, row.semester, "", day_formula, row.week,
             row.date, row.start_time, row.end_time, row.all_day,
             row.location, row.description, row.status,
             row.recurring, row.meet_link, row.uid,
         ])
+        sheet.cell(row=excel_row, column=6).number_format = "yyyy-mm-dd"
 
     for i, width in enumerate(COLUMN_WIDTHS, start=1):
         sheet.column_dimensions[get_column_letter(i)].width = width
